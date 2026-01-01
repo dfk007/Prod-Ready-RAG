@@ -17,6 +17,9 @@ COPY pyproject.toml uv.lock* ./
 # Install Python dependencies
 RUN uv sync --frozen
 
+# Install ollama if not in lock file (fallback)
+RUN uv pip install ollama>=0.3.0 || true
+
 # Copy application code
 COPY . .
 
