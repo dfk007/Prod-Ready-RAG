@@ -16,7 +16,7 @@ LLM_MODEL = "gemma3:1b"
 load_dotenv()
 
 # Initialize Ollama client (supports custom base URL via environment variable)
-ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11435")
 ollama_client = ollama.Client(host=ollama_base_url)
 
 inngest_client = inngest.Inngest(

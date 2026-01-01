@@ -1,0 +1,17 @@
+FROM ollama/ollama:latest
+
+# Install curl for healthchecks
+RUN apk add --no-cache curl
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Set custom port
+ENV OLLAMA_HOST=0.0.0.0:11435
+
+EXPOSE 11435
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["ollama", "serve"]
+

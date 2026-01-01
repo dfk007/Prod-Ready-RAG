@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: rag-ollama
+    ports:
+      - "11435:11435"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11435/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11435
+      - QDRANT_URL=http://qdrant:6333
+      - INNGEST_API_BASE=http://inngest:8288/v1
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-streamlit
+    ports:
+      - "8501:8501"
+    command: streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11435
+      - QDRANT_URL=http://qdrant:6333
+      - INNGEST_API_BASE=http://inngest:8288/v1
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - fastapi
+      - qdrant
+      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  inngest:
+    image: inngest/inngest:latest
+    container_name: rag-inngest
+    ports:
+      - "8288:8288"
+    environment:
+      - INNGEST_EVENT_KEY=test
+      - INNGEST_SIGNING_KEY=test
+    depends_on:
+      - fastapi
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8288/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  qdrant_storage:
+    driver: local
+  ollama_data:
+    driver: local
+

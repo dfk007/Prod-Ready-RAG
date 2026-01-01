@@ -12,7 +12,7 @@ EMBED_MODEL = "nomic-embed-text"
 EMBED_DIM = 768  # nomic-embed-text produces 768-dimensional embeddings
 
 # Initialize Ollama client (supports custom base URL via environment variable)
-ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11435")
 ollama_client = ollama.Client(host=ollama_base_url)
 
 splitter = SentenceSplitter(chunk_size=1000, chunk_overlap=200)
