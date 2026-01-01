@@ -1,3 +1,4 @@
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/dfk007/Prod-Ready-RAG?utm_source=oss&utm_medium=github&utm_campaign=dfk007%2FProd-Ready-RAG&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 # Production-Grade RAG Python Application
 
 A Retrieval-Augmented Generation (RAG) application built with Python that enables document ingestion, vector search, and AI-powered question answering using PDF documents.
