@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI
 import inngest
 import inngest.fast_api
-from inngest.experimental import ai
+import ollama
 from dotenv import load_dotenv
 import uuid
 import os
@@ -11,7 +11,13 @@ from data_loader import load_and_chunk_pdf, embed_texts
 from vector_db import QdrantStorage
 from custom_types import RAQQueryResult, RAGSearchResult, RAGUpsertResult, RAGChunkAndSrc
 
+LLM_MODEL = "gemma3:1b"
+
 load_dotenv()
+
+# Initialize Ollama client (supports custom base URL via environment variable)
+ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+ollama_client = ollama.Client(host=ollama_base_url)
 
 inngest_client = inngest.Inngest(
     app_id="rag_app",
@@ -77,25 +83,22 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
         "Answer concisely using the context above."
     )
 
-    adapter = ai.openai.Adapter(
-        auth_key=os.getenv("OPENAI_API_KEY"),
-        model="gpt-4o-mini"
-    )
+    def _generate_answer() -> str:
+        """Generate answer using Ollama."""
+        system_prompt = "You answer questions using only the provided context."
+        full_prompt = f"{system_prompt}\n\n{user_content}"
+        
+        response = ollama_client.generate(
+            model=LLM_MODEL,
+            prompt=full_prompt,
+            options={
+                "temperature": 0.2,
+                "num_predict": 1024,  # max_tokens equivalent
+            }
+        )
+        return response["response"].strip()
 
-    res = await ctx.step.ai.infer(
-        "llm-answer",
-        adapter=adapter,
-        body={
-            "max_tokens": 1024,
-            "temperature": 0.2,
-            "messages": [
-                {"role": "system", "content": "You answer questions using only the provided context."},
-                {"role": "user", "content": user_content}
-            ]
-        }
-    )
-
-    answer = res["choices"][0]["message"]["content"].strip()
+    answer = await ctx.step.run("llm-answer", lambda: _generate_answer())
     return {"answer": answer, "sources": found.sources, "num_contexts": len(found.contexts)}
 
 app = FastAPI()
