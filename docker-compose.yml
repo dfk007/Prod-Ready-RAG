@@ -9,11 +9,6 @@ services:
       - qdrant_storage:/qdrant/storage
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   ollama:
     build:
@@ -46,7 +41,7 @@ services:
       - ./uploads:/app/uploads
     depends_on:
       qdrant:
-        condition: service_healthy
+        condition: service_started
       ollama:
         condition: service_healthy
     healthcheck:
@@ -84,6 +79,7 @@ services:
     container_name: rag-inngest
     ports:
       - "8288:8288"
+    command: inngest dev
     environment:
       - INNGEST_EVENT_KEY=test
       - INNGEST_SIGNING_KEY=test

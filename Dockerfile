@@ -23,11 +23,18 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
+# Make venv Python available in PATH
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Expose ports
 # 8000 for FastAPI
 # 8501 for Streamlit
 EXPOSE 8000 8501
 
+# Make venv Python available in PATH
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Default command (can be overridden in docker-compose)
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use venv python explicitly
+CMD ["/app/.venv/bin/python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
