@@ -22,9 +22,11 @@ def get_inngest_client() -> inngest.Inngest:
     # 
     # For Docker: These are set in docker-compose.yml
     # For local: Set in .env file or use defaults
+    # 
+    # NOTE: The SDK reads these from env vars automatically - don't pass them as kwargs!
     return inngest.Inngest(
         app_id="rag_app",
-        is_production=False
+        is_production=False,
     )
 
 
@@ -38,61 +40,33 @@ def save_uploaded_pdf(file) -> Path:
 
 
 def send_rag_ingest_event(pdf_path: Path) -> None:
-    # Verify Inngest is reachable before sending
-    api_base = os.getenv("INNGEST_API_BASE", "http://127.0.0.1:8288/v1")
-    try:
-        # Quick health check
-        health_url = api_base.replace("/v1", "/api/health")
-        response = requests.get(health_url, timeout=2)
-        response.raise_for_status()
-    except Exception as e:
-        raise ConnectionError(
-            f"Cannot reach Inngest service at {api_base}. "
-            f"Please ensure the Inngest service is running and accessible. Error: {str(e)}"
+    """Send RAG ingest event using Inngest SDK client."""
+    # Use the Inngest SDK client - it knows the correct endpoint
+    client = get_inngest_client()
+    
+    # Send event using SDK (handles async internally)
+    async def _send():
+        return await client.send(
+            inngest.Event(
+                name="rag/ingest_pdf",
+                data={
+                    "pdf_path": str(pdf_path.resolve()),
+                    "source_id": pdf_path.name,
+                }
+            )
         )
     
-    # Send event via direct HTTP API call to avoid SDK configuration issues
-    event_key = os.getenv("INNGEST_EVENT_KEY")
-    headers = {"Content-Type": "application/json"}
-    if event_key:
-        headers["Authorization"] = f"Bearer {event_key}"
-    
-    # Inngest API expects events as an array
-    event_data = [{
-        "name": "rag/ingest_pdf",
-        "data": {
-            "pdf_path": str(pdf_path.resolve()),
-            "source_id": pdf_path.name,
-        }
-    }]
-    
-    # Inngest dev server uses /api/events endpoint (without /v1 prefix)
-    # Extract base URL and construct correct endpoint
-    base_url = api_base.replace("/v1", "").rstrip("/")
-    events_url = f"{base_url}/api/events"
-    
-    response = requests.post(
-        events_url,
-        json=event_data,
-        headers=headers,
-        timeout=10
-    )
-    response.raise_for_status()
-    
-    # Check if response is actually JSON (for ingest, we just need success)
-    content_type = response.headers.get("content-type", "").lower()
-    if "application/json" not in content_type and "text/json" not in content_type:
-        # For ingest, HTML response might be acceptable if status is 200
-        # But log a warning
-        if response.status_code == 200:
-            # Assume success if we get 200, even if it's HTML
-            return
-        else:
-            preview = response.text[:200] if response.text else "(empty response)"
-            raise ValueError(
-                f"Inngest endpoint returned non-JSON response (Content-Type: {content_type}, Status: {response.status_code}). "
-                f"Response preview: {preview}..."
-            )
+    try:
+        # Run async function in sync context
+        result = asyncio.run(_send())
+        # SDK returns event IDs on success
+        if not result:
+            raise ValueError("Inngest SDK returned no result - event may not have been sent")
+    except Exception as e:
+        raise ConnectionError(
+            f"Failed to send event to Inngest: {str(e)}. "
+            f"Please ensure the Inngest service is running and accessible."
+        )
 
 
 st.title("Upload a PDF to Ingest")
@@ -117,82 +91,37 @@ st.title("Ask a question about your PDFs")
 
 
 def send_rag_query_event(question: str, top_k: int) -> str:
-    # Verify Inngest is reachable before sending
-    api_base = os.getenv("INNGEST_API_BASE", "http://127.0.0.1:8288/v1")
+    """Send RAG query event using Inngest SDK client and return event ID."""
+    # Use the Inngest SDK client - it knows the correct endpoint
+    client = get_inngest_client()
+    
+    # Send event using SDK (handles async internally)
+    async def _send():
+        return await client.send(
+            inngest.Event(
+                name="rag/query_pdf_ai",
+                data={
+                    "question": question,
+                    "top_k": top_k,
+                }
+            )
+        )
+    
     try:
-        # Quick health check
-        health_url = api_base.replace("/v1", "/api/health")
-        response = requests.get(health_url, timeout=2)
-        response.raise_for_status()
+        # Run async function in sync context
+        result = asyncio.run(_send())
+        
+        # SDK returns a list of event IDs: ["event-id-1", "event-id-2", ...]
+        if isinstance(result, list) and len(result) > 0:
+            return result[0]  # Return first event ID
+        else:
+            raise ValueError(f"Inngest SDK returned unexpected format: {result}")
+            
     except Exception as e:
         raise ConnectionError(
-            f"Cannot reach Inngest service at {api_base}. "
-            f"Please ensure the Inngest service is running and accessible. Error: {str(e)}"
+            f"Failed to send event to Inngest: {str(e)}. "
+            f"Please ensure the Inngest service is running and accessible."
         )
-    
-    # Send event via direct HTTP API call to avoid SDK configuration issues
-    event_key = os.getenv("INNGEST_EVENT_KEY")
-    headers = {"Content-Type": "application/json"}
-    if event_key:
-        headers["Authorization"] = f"Bearer {event_key}"
-    
-    # Inngest API expects events as an array
-    event_data = [{
-        "name": "rag/query_pdf_ai",
-        "data": {
-            "question": question,
-            "top_k": top_k,
-        }
-    }]
-    
-    # Inngest dev server uses /api/events endpoint (without /v1 prefix)
-    # Extract base URL and construct correct endpoint
-    base_url = api_base.replace("/v1", "").rstrip("/")
-    events_url = f"{base_url}/api/events"
-    
-    response = requests.post(
-        events_url,
-        json=event_data,
-        headers=headers,
-        timeout=10
-    )
-    response.raise_for_status()
-    
-    # Check if response is actually JSON before parsing
-    content_type = response.headers.get("content-type", "").lower()
-    if "application/json" not in content_type and "text/json" not in content_type:
-        # Response is not JSON - likely HTML dashboard UI
-        preview = response.text[:200] if response.text else "(empty response)"
-        raise ValueError(
-            f"Inngest endpoint returned non-JSON response (Content-Type: {content_type}). "
-            f"This usually means the endpoint is serving the dashboard UI instead of processing events. "
-            f"Response preview: {preview}..."
-        )
-    
-    try:
-        result = response.json()
-    except ValueError as e:
-        # JSON parsing failed
-        preview = response.text[:200] if response.text else "(empty response)"
-        raise ValueError(
-            f"Failed to parse JSON response from Inngest. "
-            f"Response preview: {preview}... "
-            f"Original error: {str(e)}"
-        )
-    
-    # Return the event ID from the response
-    # Inngest returns: {"ids": ["event-id-1", "event-id-2", ...]}
-    if isinstance(result, dict) and "ids" in result:
-        ids = result["ids"]
-        if ids and len(ids) > 0:
-            return ids[0]
-    elif isinstance(result, list) and len(result) > 0:
-        # Handle array response format
-        first_item = result[0]
-        if isinstance(first_item, dict):
-            return first_item.get("ids", [None])[0] if "ids" in first_item else first_item.get("id")
-    
-    raise ValueError(f"Unexpected response format from Inngest: {result}")
 
 
 def _inngest_api_base() -> str:
