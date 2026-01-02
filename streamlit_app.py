@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 import time
 
@@ -44,9 +43,9 @@ def send_rag_ingest_event(pdf_path: Path) -> None:
     # Use the Inngest SDK client - it knows the correct endpoint
     client = get_inngest_client()
     
-    # Send event using SDK (handles async internally)
-    async def _send():
-        return await client.send(
+    try:
+        # Use synchronous API to avoid conflicts with Streamlit's async runtime
+        result = client.send_sync(
             inngest.Event(
                 name="rag/ingest_pdf",
                 data={
@@ -55,13 +54,12 @@ def send_rag_ingest_event(pdf_path: Path) -> None:
                 }
             )
         )
-    
-    try:
-        # Run async function in sync context
-        result = asyncio.run(_send())
-        # SDK returns event IDs on success
-        if not result:
-            raise ValueError("Inngest SDK returned no result - event may not have been sent")
+        # SDK returns list[str] of event IDs on success
+        if not isinstance(result, list) or len(result) == 0:
+            raise ValueError("Inngest SDK returned no event IDs - event may not have been sent")
+    except (ValueError, ConnectionError) as e:
+        # Preserve original error types
+        raise
     except Exception as e:
         raise ConnectionError(
             f"Failed to send event to Inngest: {str(e)}. "
@@ -95,9 +93,9 @@ def send_rag_query_event(question: str, top_k: int) -> str:
     # Use the Inngest SDK client - it knows the correct endpoint
     client = get_inngest_client()
     
-    # Send event using SDK (handles async internally)
-    async def _send():
-        return await client.send(
+    try:
+        # Use synchronous API to avoid conflicts with Streamlit's async runtime
+        result = client.send_sync(
             inngest.Event(
                 name="rag/query_pdf_ai",
                 data={
@@ -106,17 +104,16 @@ def send_rag_query_event(question: str, top_k: int) -> str:
                 }
             )
         )
-    
-    try:
-        # Run async function in sync context
-        result = asyncio.run(_send())
         
-        # SDK returns a list of event IDs: ["event-id-1", "event-id-2", ...]
+        # SDK returns list[str] of event IDs: ["event-id-1", "event-id-2", ...]
         if isinstance(result, list) and len(result) > 0:
             return result[0]  # Return first event ID
         else:
-            raise ValueError(f"Inngest SDK returned unexpected format: {result}")
+            raise ValueError(f"Inngest SDK returned empty or invalid result: {result}")
             
+    except (ValueError, ConnectionError) as e:
+        # Preserve original error types
+        raise
     except Exception as e:
         raise ConnectionError(
             f"Failed to send event to Inngest: {str(e)}. "
