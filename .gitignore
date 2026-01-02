@@ -9,4 +9,7 @@ wheels/
 # Virtual environments
 .venv
 /uploads
-.env
+
+# Global Cursor Rules
+global-cursor-rules.md
+

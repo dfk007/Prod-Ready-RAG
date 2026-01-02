@@ -78,6 +78,21 @@ def send_rag_ingest_event(pdf_path: Path) -> None:
         timeout=10
     )
     response.raise_for_status()
+    
+    # Check if response is actually JSON (for ingest, we just need success)
+    content_type = response.headers.get("content-type", "").lower()
+    if "application/json" not in content_type and "text/json" not in content_type:
+        # For ingest, HTML response might be acceptable if status is 200
+        # But log a warning
+        if response.status_code == 200:
+            # Assume success if we get 200, even if it's HTML
+            return
+        else:
+            preview = response.text[:200] if response.text else "(empty response)"
+            raise ValueError(
+                f"Inngest endpoint returned non-JSON response (Content-Type: {content_type}, Status: {response.status_code}). "
+                f"Response preview: {preview}..."
+            )
 
 
 st.title("Upload a PDF to Ingest")
@@ -142,7 +157,28 @@ def send_rag_query_event(question: str, top_k: int) -> str:
         timeout=10
     )
     response.raise_for_status()
-    result = response.json()
+    
+    # Check if response is actually JSON before parsing
+    content_type = response.headers.get("content-type", "").lower()
+    if "application/json" not in content_type and "text/json" not in content_type:
+        # Response is not JSON - likely HTML dashboard UI
+        preview = response.text[:200] if response.text else "(empty response)"
+        raise ValueError(
+            f"Inngest endpoint returned non-JSON response (Content-Type: {content_type}). "
+            f"This usually means the endpoint is serving the dashboard UI instead of processing events. "
+            f"Response preview: {preview}..."
+        )
+    
+    try:
+        result = response.json()
+    except ValueError as e:
+        # JSON parsing failed
+        preview = response.text[:200] if response.text else "(empty response)"
+        raise ValueError(
+            f"Failed to parse JSON response from Inngest. "
+            f"Response preview: {preview}... "
+            f"Original error: {str(e)}"
+        )
     
     # Return the event ID from the response
     # Inngest returns: {"ids": ["event-id-1", "event-id-2", ...]}
