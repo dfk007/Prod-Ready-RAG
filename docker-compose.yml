@@ -62,6 +62,8 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11435
       - QDRANT_URL=http://qdrant:6333
       - INNGEST_API_BASE=http://inngest:8288/v1
+      - INNGEST_EVENT_KEY=test
+      - INNGEST_SIGNING_KEY=test
     volumes:
       - ./uploads:/app/uploads
     depends_on:

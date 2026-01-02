@@ -15,7 +15,15 @@ st.set_page_config(page_title="RAG Ingest PDF", page_icon="📄", layout="center
 
 @st.cache_resource
 def get_inngest_client() -> inngest.Inngest:
-    return inngest.Inngest(app_id="rag_app", is_production=False)
+    # The Inngest SDK automatically reads INNGEST_API_BASE from environment
+    # For Docker: INNGEST_API_BASE=http://inngest:8288/v1 (set in docker-compose.yml)
+    # For local: INNGEST_API_BASE=http://127.0.0.1:8288/v1 (default)
+    # 
+    # The SDK also reads INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY if needed
+    return inngest.Inngest(
+        app_id="rag_app",
+        is_production=False
+    )
 
 
 def save_uploaded_pdf(file) -> Path:
