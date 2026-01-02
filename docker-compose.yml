@@ -67,9 +67,14 @@ services:
     volumes:
       - ./uploads:/app/uploads
     depends_on:
-      - fastapi
-      - qdrant
-      - ollama
+      fastapi:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+      inngest:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
       interval: 10s
