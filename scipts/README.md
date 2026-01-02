@@ -114,6 +114,60 @@ curl -s -X POST http://inngest:8288/api/events \
 - **✗ 404 Not Found**: Endpoint doesn't exist
 - **✗ Other HTTP codes**: Various errors (check response body)
 
+### 5. `restart-containers.sh`
+**Rebuild and restart containers** - Use after code changes
+
+```bash
+# Rebuild and restart a specific service (recommended after code changes)
+./scipts/restart-containers.sh streamlit
+
+# Rebuild and restart all services
+./scipts/restart-containers.sh
+```
+
+Features:
+- Rebuilds with `--no-cache` to ensure latest code
+- Shows service status after restart
+- Lists available services and helpful commands
+
+### 6. `quick-restart.sh`
+**Quick restart without rebuild** - Use when no code changes
+
+```bash
+# Restart a specific service
+./scipts/quick-restart.sh streamlit
+
+# Restart all services
+./scipts/quick-restart.sh
+```
+
+Features:
+- Fast restart without rebuilding images
+- Useful for configuration changes or service issues
+
+## Container Management
+
+### After Code Changes
+```bash
+# Always rebuild after modifying code
+./scipts/restart-containers.sh streamlit
+```
+
+### Quick Restart (No Code Changes)
+```bash
+# Just restart the service
+./scipts/quick-restart.sh streamlit
+```
+
+### View Logs
+```bash
+# View logs for a service
+docker compose logs -f streamlit
+
+# View logs for all services
+docker compose logs -f
+```
+
 ## Making Scripts Executable
 
 ```bash
