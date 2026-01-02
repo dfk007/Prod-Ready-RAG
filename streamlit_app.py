@@ -66,8 +66,13 @@ def send_rag_ingest_event(pdf_path: Path) -> None:
         }
     }]
     
+    # Inngest dev server uses /api/events endpoint (without /v1 prefix)
+    # Extract base URL and construct correct endpoint
+    base_url = api_base.replace("/v1", "").rstrip("/")
+    events_url = f"{base_url}/api/events"
+    
     response = requests.post(
-        f"{api_base}/events",
+        events_url,
         json=event_data,
         headers=headers,
         timeout=10
@@ -125,8 +130,13 @@ def send_rag_query_event(question: str, top_k: int) -> str:
         }
     }]
     
+    # Inngest dev server uses /api/events endpoint (without /v1 prefix)
+    # Extract base URL and construct correct endpoint
+    base_url = api_base.replace("/v1", "").rstrip("/")
+    events_url = f"{base_url}/api/events"
+    
     response = requests.post(
-        f"{api_base}/events",
+        events_url,
         json=event_data,
         headers=headers,
         timeout=10
